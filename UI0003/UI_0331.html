@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>离线书签管理器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --background-color: #f4f6f8;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --border-radius: 8px; /* Slightly reduced */
+            --box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            --transition: all 0.3s ease;
+            --button-height: 32px; /* Slightly taller buttons */
+            --card-min-height: 180px; /* Increased height for new fields */
+            --card-padding: 10px; /* Adjusted padding */
+            --content-margin: 5px;
+            --grid-columns: 4; /* Default columns */
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--background-color);
+            color: var(--text-color);
+            transition: var(--transition);
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1400px; /* Wider container */
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .search-container {
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+            min-width: 250px;
+            margin-right: 10px;
+        }
+
+        #search-input {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            height: var(--button-height);
+            box-sizing: border-box;
+            flex-grow: 1;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .view-options {
+             display: flex;
+             align-items: center;
+             gap: 5px;
+        }
+         .view-options label {
+             font-size: 13px;
+             color: var(--secondary-color);
+         }
+        #view-select {
+            padding: 4px 8px;
+            height: var(--button-height);
+            border-radius: var(--border-radius);
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+
+
+        button {
+            padding: 0 15px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            height: var(--button-height);
+            box-sizing: border-box;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            min-width: 80px;
+            white-space: nowrap; /* Prevent button text wrap */
+        }
+
+        button.primary { background-color: var(--primary-color); color: white; }
+        button.secondary { background-color: var(--secondary-color); color: white; }
+        button.success { background-color: var(--success-color); color: white; }
+        button.danger { background-color: var(--danger-color); color: white; }
+        button.warning { background-color: var(--warning-color); color: #333; } /* Undo */
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+        button:active:not(:disabled) { transform: translateY(0); }
+
+        #bookmarks-list {
+            display: grid;
+             /* Dynamically set by JS based on --grid-columns */
+             /* Example: grid-template-columns: repeat(var(--grid-columns, 4), 1fr); */
+            gap: 15px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .bookmark-card {
+            background: var(--card-background);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            padding: var(--card-padding);
+            min-height: var(--card-min-height); /* Use min-height */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: var(--transition);
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+            border: 1px solid transparent; /* Border for selection highlight */
+        }
+        .bookmark-card.selected {
+             border-color: var(--primary-color);
+             box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
+         }
+
+
+        .bookmark-card.dragging { opacity: 0.5; cursor: grabbing; transform: scale(1.03); }
+        .bookmark-card.drop-target { background-color: #e0e0e0; }
+        .bookmark-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.08); }
+
+        /* Checkbox */
+         .card-checkbox {
+             position: absolute;
+             top: 8px;
+             left: 8px;
+             display: none; /* Hidden by default */
+             z-index: 2;
+         }
+         .bookmark-card.edit-mode .card-checkbox {
+             display: block; /* Visible in edit mode */
+         }
+
+        /* Card Content */
+        .bookmark-content {
+            flex-grow: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+             margin-left: 25px; /* Space for checkbox when visible */
+         }
+        .bookmark-card:not(.edit-mode) .bookmark-content {
+             margin-left: 0; /* No space needed if not in edit mode */
+         }
+
+
+        .bookmark-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: var(--content-margin);
+        }
+
+        .favicon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px; /* Increased space */
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+
+        .bookmark-name {
+            font-weight: 700; /* Bolder name */
+            font-size: 15px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-color);
+            flex-grow: 1;
+        }
+
+         .bookmark-category {
+             font-size: 11px;
+             color: var(--primary-color);
+             background-color: rgba(0, 123, 255, 0.1);
+             padding: 2px 6px;
+             border-radius: 4px;
+             margin-left: 8px;
+             white-space: nowrap;
+             overflow: hidden;
+             text-overflow: ellipsis;
+             max-width: 100px; /* Limit category width */
+             flex-shrink: 0; /* Prevent shrinking */
+         }
+
+        .bookmark-url {
+            font-size: 12px;
+            color: var(--secondary-color);
+            word-break: break-all;
+            line-height: 1.4;
+            max-height: calc(1.4em * 2); /* Limit URL to 2 lines approx */
+            overflow: hidden;
+             display: -webkit-box;
+             -webkit-box-orient: vertical;
+             -webkit-line-clamp: 2;
+            text-overflow: ellipsis;
+            margin-bottom: var(--content-margin);
+        }
+
+        .bookmark-description {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+            flex-grow: 1; /* Take remaining space */
+            overflow: hidden;
+             display: -webkit-box;
+             -webkit-box-orient: vertical;
+             -webkit-line-clamp: 3; /* Limit description lines */
+            text-overflow: ellipsis;
+            margin-bottom: var(--content-margin);
+            margin-top: 4px;
+        }
+
+
+         .bookmark-actions {
+            display: none;
+            justify-content: flex-end;
+            gap: 5px;
+            margin-top: auto;
+            padding-top: 5px;
+            border-top: 1px solid #eee; /* Separator line */
+            margin-left: 25px; /* Align with content */
+         }
+        .bookmark-card:not(.edit-mode) .bookmark-actions {
+             margin-left: 0;
+         }
+
+
+        .bookmark-card.edit-mode .bookmark-actions { display: flex; }
+        .bookmark-card.edit-mode .bookmark-content > a { pointer-events: none; }
+        .bookmark-card.edit-mode { cursor: default; }
+        .bookmark-card:not(.edit-mode) { cursor: grab; } /* Ensure grab cursor only when draggable */
+
+
+        .bookmark-actions button {
+            padding: 3px 8px;
+            font-size: 11px;
+            height: auto;
+            min-width: auto;
+            border-radius: 5px;
+        }
+
+        /* Modal Base Styles */
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5); animation: fadeIn 0.3s ease;
+        }
+        .modal-content {
+            background-color: var(--card-background); margin: 8% auto; padding: 30px; border: 1px solid #ddd;
+            width: 90%; max-width: 600px; /* Wider modal */ border-radius: var(--border-radius);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); position: relative; animation: slideIn 0.3s ease;
+        }
+        .close-button {
+            color: #aaa; position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; cursor: pointer;
+        }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; }
+        .modal h2 { margin-top: 0; color: var(--primary-color); font-weight: 500; margin-bottom: 20px; }
+        .modal label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; }
+        .modal input[type="text"], .modal input[type="url"], .modal textarea, .modal select {
+            width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc;
+            border-radius: var(--border-radius); box-sizing: border-box; font-size: 14px;
+            font-family: inherit;
+        }
+         .modal textarea { min-height: 80px; resize: vertical; }
+        .modal button[type="submit"], .modal button.modal-action {
+            width: 100%; padding: 12px; font-size: 16px; height: auto; margin-top: 10px;
+        }
+
+        /* Message Board Modal */
+        #message-textarea {
+             min-height: 200px;
+             font-size: 15px;
+             line-height: 1.6;
+             background-color: #fdfdfd;
+             cursor: text; /* Indicate editable on double click */
+         }
+         #message-textarea:not(:focus) {
+             background-color: #eee; /* Read-only appearance */
+             cursor: default;
+         }
+        .message-instructions {
+            font-size: 12px;
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+        }
+
+        /* Export Options */
+         .export-options {
+             margin-top: 20px;
+             padding-top: 15px;
+             border-top: 1px solid #eee;
+         }
+         .export-options label {
+             margin-right: 15px;
+             font-weight: normal;
+         }
+         .export-options input[type="radio"] {
+             margin-right: 5px;
+         }
+         #export-button-final {
+             margin-top: 15px;
+         }
+
+
+        /* Footer */
+        footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 12px;
+            color: var(--secondary-color);
+        }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            header { flex-direction: column; align-items: stretch; }
+            .search-container { margin-right: 0; margin-bottom: 10px; }
+            .button-group { justify-content: center; }
+            #bookmarks-list { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); } /* Adjust grid for mobile */
+            .modal-content { width: 95%; margin: 15% auto; }
+        }
+         @media (max-width: 480px) {
+            body { padding: 10px; }
+            button { font-size: 13px; padding: 0 10px; }
+            #search-input { font-size: 13px; }
+            .modal-content { padding: 20px; }
+            .modal h2 { font-size: 18px; }
+            #bookmarks-list { grid-template-columns: 1fr; } /* Single column on very small screens */
+            .bookmark-content, .bookmark-actions { margin-left: 0; } /* No indent needed */
+         }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="搜索名称、链接、简介、分类...">
+            </div>
+            <div class="button-group">
+                <button id="add-bookmark-btn" class="primary">添加书签</button>
+                <button id="edit-mode-btn" class="secondary">编辑模式</button>
+                <button id="message-board-btn" class="secondary">留言板</button>
+                <button id="batch-delete-btn" class="danger" style="display: none;">批量删除</button>
+                <button id="undo-btn" class="warning" disabled>撤销删除</button>
+                <button id="import-btn" class="success">导入</button>
+                <button id="export-btn" class="success">导出</button>
+                <div class="view-options">
+                    <label for="view-select">视图:</label>
+                    <select id="view-select">
+                        <option value="1">1列</option>
+                        <option value="2">2列</option>
+                        <option value="3">3列</option>
+                        <option value="4" selected>4列</option>
+                        <option value="5">5列</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <ul id="bookmarks-list">
+                </ul>
+        </main>
+
+        <footer>
+            注意：书签和留言数据存储在浏览器本地，清空缓存可能导致数据丢失，请定期使用“导出”功能备份。
+        </footer>
+    </div>
+
+    <div id="bookmark-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="modal-title">添加书签</h2>
+            <form id="bookmark-form">
+                <input type="hidden" id="bookmark-id">
+                <label for="bookmark-name">名称:</label>
+                <input type="text" id="bookmark-name" required>
+
+                <label for="bookmark-url">链接 (URL):</label>
+                <input type="url" id="bookmark-url" required>
+
+                <label for="bookmark-description">简介:</label>
+                <textarea id="bookmark-description"></textarea>
+
+                <label for="bookmark-category">分类:</label>
+                <input type="text" id="bookmark-category" placeholder="例如：工作, 学习, 工具...">
+
+                <button type="submit" class="primary" id="modal-submit-btn">添加</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="message-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>留言板</h2>
+            <p class="message-instructions">双击下方区域开始编辑，编辑完成后点击保存。</p>
+            <textarea id="message-textarea" readonly placeholder="在此处留言..."></textarea>
+            <button id="save-message-btn" class="primary modal-action">保存留言</button>
+        </div>
+    </div>
+
+     <div id="export-modal" class="modal">
+         <div class="modal-content">
+             <span class="close-button">&times;</span>
+             <h2>选择导出格式</h2>
+             <div class="export-options">
+                 <label>
+                     <input type="radio" name="export-format" value="json" checked> JSON (推荐，可用于导入回本工具)
+                 </label><br>
+                 <label>
+                     <input type="radio" name="export-format" value="html"> HTML (可导入到浏览器书签)
+                 </label><br>
+                 <label>
+                     <input type="radio" name="export-format" value="txt"> TXT (简单文本格式)
+                 </label>
+             </div>
+             <button id="export-button-final" class="success modal-action">确认导出</button>
+             <p style="font-size: 12px; color: var(--secondary-color); margin-top: 15px;">
+                 提示：文件将保存到您的浏览器下载目录。如果是为了在本工具中重新导入，JSON格式最佳。HTML文件可直接导入多数浏览器。
+             </p>
+         </div>
+     </div>
+
+
+     <div id="welcome-modal" class="modal">
+         <div class="modal-content">
+             <span class="close-button">&times;</span>
+             <h2>欢迎使用离线书签管理器!</h2>
+             <p>这是一个离线书签管理器，可帮助您在本地管理书签和留言，无需联网即可使用，支持分类管理和搜索。</p>
+             <p>主要功能:</p>
+             <ul>
+                 <li>添加/编辑/删除书签 (支持简介和分类)。</li>
+                 <li>批量删除与撤销删除。</li>
+                 <li>拖拽排序。</li>
+                 <li>本地留言板。</li>
+                 <li>导入/导出 (JSON, HTML, TXT)。</li>
+                 <li>即时搜索 (防抖)。</li>
+                 <li>切换列表视图。</li>
+             </ul>
+             <p style="color: var(--danger-color); font-weight: bold;">
+                 重要提示：所有数据（书签和留言）都存储在您的浏览器本地存储中。清除浏览器缓存或在隐私模式下使用可能会导致数据丢失。强烈建议您定期使用“导出”功能进行备份！
+             </p>
+             <button id="close-welcome-btn" class="primary modal-action">开始使用</button>
+         </div>
+     </div>
+
+    <script>
+        (() => { // IIFE starts here
+            // DOM References
+            const bookmarksList = document.getElementById('bookmarks-list');
+            const addBookmarkBtn = document.getElementById('add-bookmark-btn');
+            const searchInput = document.getElementById('search-input');
+            const editModeBtn = document.getElementById('edit-mode-btn');
+            const messageBoardBtn = document.getElementById('message-board-btn');
+            const batchDeleteBtn = document.getElementById('batch-delete-btn');
+            const undoBtn = document.getElementById('undo-btn');
+            const importBtn = document.getElementById('import-btn');
+            const exportBtn = document.getElementById('export-btn'); // Button to open export modal
+            const viewSelect = document.getElementById('view-select');
+
+            // Bookmark Modal Elements
+            const bookmarkModal = document.getElementById('bookmark-modal');
+            const bookmarkModalTitle = document.getElementById('modal-title');
+            const bookmarkForm = document.getElementById('bookmark-form');
+            const bookmarkIdInput = document.getElementById('bookmark-id');
+            const bookmarkNameInput = document.getElementById('bookmark-name');
+            const bookmarkUrlInput = document.getElementById('bookmark-url');
+            const bookmarkDescriptionInput = document.getElementById('bookmark-description');
+            const bookmarkCategoryInput = document.getElementById('bookmark-category');
+            const bookmarkModalSubmitBtn = document.getElementById('modal-submit-btn');
+            const closeBookmarkModalBtn = bookmarkModal.querySelector('.close-button');
+
+            // Message Modal Elements
+            const messageModal = document.getElementById('message-modal');
+            const messageTextarea = document.getElementById('message-textarea');
+            const saveMessageBtn = document.getElementById('save-message-btn');
+            const closeMessageModalBtn = messageModal.querySelector('.close-button');
+
+            // Export Modal Elements
+            const exportModal = document.getElementById('export-modal');
+            const exportButtonFinal = document.getElementById('export-button-final');
+            const closeExportModalBtn = exportModal.querySelector('.close-button');
+
+             // Welcome Modal Elements
+             const welcomeModal = document.getElementById('welcome-modal');
+             const closeWelcomeBtn = document.getElementById('close-welcome-btn');
+             const closeWelcomeXBtn = welcomeModal.querySelector('.close-button');
+
+
+            // Application State
+            let state = {
+                bookmarks: [],
+                messages: "", // Store messages as a single string for simplicity now
+                recentlyDeleted: [], // Stores recently deleted bookmark objects for undo
+                filteredBookmarks: [],
+                searchTerm: '',
+                isEditMode: false,
+                selectedBookmarks: new Set(), // Stores IDs/indices of selected bookmarks for batch delete
+                viewColumns: 4, // Default grid columns
+                isFirstRun: true // Assume first run initially
+            };
+
+            let dragSrcIndex = null;
+            let dropTarget = null;
+            let searchTimeout = null; // For debounce
+
+            // --- Constants ---
+            const LOCAL_STORAGE_KEYS = {
+                bookmarks: 'offlineBookmarks',
+                messages: 'offlineMessages',
+                viewColumns: 'offlineViewColumns',
+                firstRun: 'offlineFirstRunDone'
+            };
+            const DEBOUNCE_DELAY = 300; // milliseconds
+
+            // --- Utility Functions ---
+            function debounce(func, delay) {
+                return function(...args) {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        func.apply(this, args);
+                    }, delay);
+                };
+            }
+
+            // --- Data Persistence ---
+            function saveData() {
+                try {
+                    localStorage.setItem(LOCAL_STORAGE_KEYS.bookmarks, JSON.stringify(state.bookmarks));
+                    localStorage.setItem(LOCAL_STORAGE_KEYS.messages, state.messages);
+                    localStorage.setItem(LOCAL_STORAGE_KEYS.viewColumns, state.viewColumns.toString());
+                    localStorage.setItem(LOCAL_STORAGE_KEYS.firstRun, 'true'); // Mark first run as done
+                    state.isFirstRun = false; // Update runtime state
+                    console.log("Data saved.");
+                } catch (error) {
+                    console.error("Error saving data to localStorage:", error);
+                    alert("保存数据时出错，您的浏览器可能不支持本地存储或已满。");
+                }
+            }
+
+            function loadData() {
+                try {
+                    const storedBookmarks = localStorage.getItem(LOCAL_STORAGE_KEYS.bookmarks);
+                    const storedMessages = localStorage.getItem(LOCAL_STORAGE_KEYS.messages);
+                    const storedColumns = localStorage.getItem(LOCAL_STORAGE_KEYS.viewColumns);
+                    const firstRunDone = localStorage.getItem(LOCAL_STORAGE_KEYS.firstRun);
+
+                    state.isFirstRun = !firstRunDone; // It's first run if the flag is not 'true'
+
+                    if (storedBookmarks) {
+                        const parsedBookmarks = JSON.parse(storedBookmarks);
+                         // Basic validation and adding unique ID if missing (for selection)
+                         if (Array.isArray(parsedBookmarks)) {
+                             state.bookmarks = parsedBookmarks.map((bm, index) => ({
+                                 id: bm.id || Date.now() + index, // Add unique ID
+                                 name: bm.name || '',
+                                 url: bm.url || '',
+                                 description: bm.description || '',
+                                 category: bm.category || ''
+                             }));
+                         } else { state.bookmarks = []; }
+                    } else {
+                        state.bookmarks = [];
+                    }
+
+                    state.messages = storedMessages || ""; // Load messages or default to empty
+
+                    state.viewColumns = storedColumns ? parseInt(storedColumns, 10) : 4;
+                    if (isNaN(state.viewColumns) || state.viewColumns < 1 || state.viewColumns > 5) {
+                         state.viewColumns = 4; // Reset to default if invalid
+                     }
+
+
+                } catch (error) {
+                    console.error("Error loading data from localStorage:", error);
+                    alert("加载数据时出错，将使用默认设置。");
+                    // Reset state on significant load error
+                    state.bookmarks = [];
+                    state.messages = "";
+                    state.viewColumns = 4;
+                    state.isFirstRun = true;
+                    // Clear potentially corrupted storage
+                    Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+                }
+                 // Apply loaded settings and render
+                 applyViewColumns();
+                 filterAndRenderBookmarks();
+                 updateUndoButtonState(); // Initial state
+            }
+
+            // --- Rendering & UI Updates ---
+             function applyViewColumns() {
+                bookmarksList.style.gridTemplateColumns = `repeat(${state.viewColumns}, 1fr)`;
+                viewSelect.value = state.viewColumns; // Sync dropdown
+             }
+
+             function getFavicon(url) {
+                 try {
+                     const urlObj = new URL(url);
+                     return `${urlObj.protocol}//${urlObj.hostname}/favicon.ico`;
+                 } catch (e) {
+                     // console.warn(`Could not parse URL for favicon: ${url}`);
+                     return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAQAAAC1+jfqAAAAEklEQVR42mNkIAAYI dangereousA+ACMUAAA6hgX4AAAAASUVORK5CYII=';
+                 }
+             }
+
+            function renderBookmarks(bookmarksToRender) {
+                 bookmarksList.innerHTML = ''; // Clear previous render
+                 if (bookmarksToRender.length === 0 && state.searchTerm) {
+                    bookmarksList.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: var(--secondary-color);">未找到匹配的书签。</p>';
+                    return;
+                 }
+                 if (bookmarksToRender.length === 0 && !state.searchTerm) {
+                     bookmarksList.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: var(--secondary-color);">暂无书签，点击 "添加书签" 创建一个吧！</p>';
+                     return;
+                 }
+
+                bookmarksToRender.forEach((bookmark) => {
+                     // Find original index for reliable ID/reference if needed, using bookmark.id
+                    const globalIndex = state.bookmarks.findIndex(bm => bm.id === bookmark.id);
+
+                    const bookmarkItem = document.createElement('li');
+                    bookmarkItem.classList.add('bookmark-card');
+                    bookmarkItem.dataset.id = bookmark.id; // Use unique ID
+                    bookmarkItem.dataset.globalIndex = globalIndex; // Store global index too
+
+                    if (state.isEditMode) bookmarkItem.classList.add('edit-mode');
+                    if (state.selectedBookmarks.has(bookmark.id)) bookmarkItem.classList.add('selected');
+
+                    bookmarkItem.draggable = !state.isEditMode; // Draggable only when not in edit mode
+
+                    // Sanitize potentially problematic characters for HTML attributes/content if necessary
+                    const safeName = bookmark.name || '';
+                    const safeUrl = bookmark.url || '';
+                    const safeDescription = bookmark.description || '';
+                    const safeCategory = bookmark.category || '';
+
+                    bookmarkItem.innerHTML = `
+                        <input type="checkbox" class="card-checkbox" data-id="${bookmark.id}" ${state.selectedBookmarks.has(bookmark.id) ? 'checked' : ''}>
+                        <div class="bookmark-content">
+                             <a href="${safeUrl}" target="_blank" title="${safeName}\n${safeUrl}">
+                                <div class="bookmark-header">
+                                    <img src="${getFavicon(safeUrl)}" alt="" class="favicon" onerror="this.style.display='none';">
+                                    <span class="bookmark-name">${safeName}</span>
+                                    ${safeCategory ? `<span class="bookmark-category">${safeCategory}</span>` : ''}
+                                </div>
+                                <p class="bookmark-url" title="${safeUrl}">${safeUrl}</p>
+                             </a>
+                             ${safeDescription ? `<p class="bookmark-description" title="${safeDescription}">${safeDescription}</p>` : ''}
+                        </div>
+                        <div class="bookmark-actions">
+                            <button class="edit-btn secondary" data-id="${bookmark.id}">编辑</button>
+                            <button class="delete-btn danger" data-id="${bookmark.id}">删除</button>
+                        </div>
+                    `;
+
+                     // --- Event Listeners for this card ---
+                     const checkbox = bookmarkItem.querySelector('.card-checkbox');
+                     const editBtn = bookmarkItem.querySelector('.edit-btn');
+                     const deleteBtn = bookmarkItem.querySelector('.delete-btn');
+
+                     // Checkbox listener (only relevant in edit mode)
+                     if (checkbox) {
+                         checkbox.addEventListener('change', (e) => {
+                             const id = e.target.dataset.id;
+                             if (e.target.checked) {
+                                 state.selectedBookmarks.add(id);
+                                 bookmarkItem.classList.add('selected');
+                             } else {
+                                 state.selectedBookmarks.delete(id);
+                                 bookmarkItem.classList.remove('selected');
+                             }
+                             updateBatchDeleteButtonState();
+                         });
+                     }
+
+                     // Edit button listener
+                     if (editBtn) {
+                         editBtn.addEventListener('click', (e) => {
+                             e.stopPropagation();
+                             editBookmark(e.target.dataset.id);
+                         });
+                     }
+
+                     // Delete button listener
+                     if (deleteBtn) {
+                         deleteBtn.addEventListener('click', (e) => {
+                             e.stopPropagation();
+                             deleteSingleBookmark(e.target.dataset.id);
+                         });
+                     }
+
+                     // Drag listeners (only if not in edit mode)
+                     if (!state.isEditMode) {
+                         bookmarkItem.addEventListener('dragstart', handleDragStart);
+                         bookmarkItem.addEventListener('dragover', handleDragOver);
+                         bookmarkItem.addEventListener('dragleave', handleDragLeave);
+                         bookmarkItem.addEventListener('drop', handleDrop);
+                         bookmarkItem.addEventListener('dragend', handleDragEnd);
+                     }
+
+                    bookmarksList.appendChild(bookmarkItem);
+                });
+            }
+
+            function filterAndRenderBookmarks() {
+                 const term = state.searchTerm.toLowerCase().trim();
+                 state.filteredBookmarks = state.bookmarks.filter(bm =>
+                     (bm.name && bm.name.toLowerCase().includes(term)) ||
+                     (bm.url && bm.url.toLowerCase().includes(term)) ||
+                     (bm.description && bm.description.toLowerCase().includes(term)) ||
+                     (bm.category && bm.category.toLowerCase().includes(term))
+                 );
+                 renderBookmarks(state.filteredBookmarks);
+                 updateBatchDeleteButtonState(); // Update button state after render
+             }
+
+             function updateUndoButtonState() {
+                 undoBtn.disabled = state.recentlyDeleted.length === 0;
+             }
+
+             function updateBatchDeleteButtonState() {
+                 batchDeleteBtn.style.display = state.isEditMode ? 'inline-flex' : 'none';
+                 batchDeleteBtn.disabled = state.selectedBookmarks.size === 0;
+                 batchDeleteBtn.textContent = `批量删除 (${state.selectedBookmarks.size})`;
+             }
+
+
+            // --- Core Functionality ---
+
+            // Bookmark CRUD + Undo
+            function addBookmark(formData) {
+                 const newBookmark = {
+                     id: Date.now().toString(), // Simple unique ID
+                     name: formData.name,
+                     url: formData.url,
+                     description: formData.description,
+                     category: formData.category
+                 };
+                 state.bookmarks.push(newBookmark);
+                 saveData();
+                 filterAndRenderBookmarks();
+                 closeBookmarkModal();
+            }
+
+            function editBookmark(bookmarkId) {
+                 const bookmarkToEdit = state.bookmarks.find(bm => bm.id === bookmarkId);
+                 if (!bookmarkToEdit) {
+                     console.error("Bookmark not found for editing:", bookmarkId);
+                     alert("编辑错误：找不到书签。");
+                     return;
+                 }
+
+                 bookmarkModalTitle.textContent = '编辑书签';
+                 bookmarkModalSubmitBtn.textContent = '更新';
+                 bookmarkIdInput.value = bookmarkToEdit.id; // Store ID for update reference
+                 bookmarkNameInput.value = bookmarkToEdit.name;
+                 bookmarkUrlInput.value = bookmarkToEdit.url;
+                 bookmarkDescriptionInput.value = bookmarkToEdit.description;
+                 bookmarkCategoryInput.value = bookmarkToEdit.category;
+                 openBookmarkModal();
+            }
+
+            function updateBookmark(formData) {
+                 const index = state.bookmarks.findIndex(bm => bm.id === formData.id);
+                 if (index !== -1) {
+                     state.bookmarks[index] = { ...state.bookmarks[index], ...formData }; // Merge updates
+                     saveData();
+                     filterAndRenderBookmarks();
+                     closeBookmarkModal();
+                 } else {
+                     console.error("Bookmark not found for updating:", formData.id);
+                     alert("更新错误：找不到书签。");
+                 }
+            }
+
+            function deleteSingleBookmark(bookmarkId) {
+                 const index = state.bookmarks.findIndex(bm => bm.id === bookmarkId);
+                 if (index !== -1) {
+                     const bookmarkToDelete = state.bookmarks[index];
+                     if (confirm(`确定要删除书签 "${bookmarkToDelete.name}" 吗？`)) {
+                         state.recentlyDeleted = [bookmarkToDelete]; // Store for potential undo
+                         state.bookmarks.splice(index, 1); // Remove from main list
+                         saveData();
+                         filterAndRenderBookmarks();
+                         updateUndoButtonState(); // Enable undo button
+                     }
+                 } else {
+                     console.error("Bookmark not found for deletion:", bookmarkId);
+                     alert("删除错误：找不到书签。");
+                 }
+            }
+
+             function batchDeleteBookmarks() {
+                 if (state.selectedBookmarks.size === 0) return;
+
+                 if (confirm(`确定要删除选中的 ${state.selectedBookmarks.size} 个书签吗？`)) {
+                     const deletedItems = [];
+                     state.bookmarks = state.bookmarks.filter(bm => {
+                         if (state.selectedBookmarks.has(bm.id)) {
+                             deletedItems.push(bm); // Collect items being deleted
+                             return false; // Filter out selected items
+                         }
+                         return true; // Keep non-selected items
+                     });
+                     state.recentlyDeleted = deletedItems; // Store batch for potential undo
+                     state.selectedBookmarks.clear(); // Clear selection
+                     saveData();
+                     filterAndRenderBookmarks(); // Re-render the list
+                     updateUndoButtonState(); // Enable undo
+                 }
+             }
+
+            function undoDelete() {
+                 if (state.recentlyDeleted.length > 0) {
+                     // Add deleted items back to the main list
+                     state.bookmarks.push(...state.recentlyDeleted);
+                     state.recentlyDeleted = []; // Clear the undo buffer
+                     saveData();
+                     filterAndRenderBookmarks();
+                     updateUndoButtonState(); // Disable undo button
+                 }
+            }
+
+
+            // Search (with Debounce)
+            const debouncedSearch = debounce(() => {
+                 state.searchTerm = searchInput.value;
+                 filterAndRenderBookmarks();
+             }, DEBOUNCE_DELAY);
+
+            // Edit Mode
+            function toggleEditMode() {
+                 state.isEditMode = !state.isEditMode;
+                 editModeBtn.textContent = state.isEditMode ? '完成编辑' : '编辑模式';
+                 editModeBtn.classList.toggle('success', state.isEditMode); // Use success color when active
+                 editModeBtn.classList.toggle('secondary', !state.isEditMode);
+
+                 // Clear selection when exiting edit mode
+                 if (!state.isEditMode) {
+                     state.selectedBookmarks.clear();
+                 }
+
+                 filterAndRenderBookmarks(); // Re-render to show/hide checkboxes/actions/selection
+                 // Batch delete button state updated within filterAndRenderBookmarks
+             }
+
+             // Message Board
+             function showMessageBoard() {
+                 messageTextarea.value = state.messages;
+                 messageTextarea.readOnly = true; // Initially read-only
+                 messageModal.style.display = 'block';
+             }
+             function handleMessageEdit() {
+                 messageTextarea.readOnly = false;
+                 messageTextarea.focus();
+             }
+             function saveMessage() {
+                 state.messages = messageTextarea.value;
+                 messageTextarea.readOnly = true; // Make read-only again
+                 saveData();
+                 alert("留言已保存。");
+                 closeMessageModal();
+             }
+
+            // Switch View
+             function switchView(columns) {
+                 const numColumns = parseInt(columns, 10);
+                 if (!isNaN(numColumns) && numColumns >= 1 && numColumns <= 5) {
+                     state.viewColumns = numColumns;
+                     applyViewColumns();
+                     saveData(); // Save preference
+                 }
+             }
+
+            // Import/Export
+             function openExportModal() {
+                 exportModal.style.display = 'block';
+             }
+             function closeExportModal() {
+                 exportModal.style.display = 'none';
+             }
+             function triggerExport() {
+                const format = document.querySelector('input[name="export-format"]:checked').value;
+                 closeExportModal(); // Close modal before triggering download
+
+                 if (state.bookmarks.length === 0) {
+                     alert("没有书签可以导出。");
+                     return;
+                 }
+
+                 let dataStr = '';
+                 let mimeType = '';
+                 let fileExtension = '';
+
+                 if (format === 'json') {
+                     dataStr = JSON.stringify(state.bookmarks.map(bm => ({ // Export without internal ID
+                        name: bm.name, url: bm.url, description: bm.description, category: bm.category
+                     })), null, 2);
+                     mimeType = 'application/json';
+                     fileExtension = 'json';
+                 } else if (format === 'html') {
+                     dataStr = generateHtmlExport(state.bookmarks);
+                     mimeType = 'text/html';
+                     fileExtension = 'html';
+                 } else if (format === 'txt') {
+                     dataStr = generateTxtExport(state.bookmarks);
+                     mimeType = 'text/plain';
+                     fileExtension = 'txt';
+                 } else {
+                    alert("无效的导出格式");
+                    return;
+                 }
+
+                const dataBlob = new Blob([dataStr], { type: mimeType });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                const timestamp = new Date().toISOString().slice(0, 10);
+                link.download = `bookmarks_${timestamp}.${fileExtension}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                 alert(`书签已导出为 ${format.toUpperCase()} 文件。请检查您的下载目录。`);
+            }
+
+             function generateHtmlExport(bookmarks) {
+                 // Standard Netscape Bookmark File Format
+                 let html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>\n`; // Start of the main list
+
+                 bookmarks.forEach(bm => {
+                     html += `    <DT><A HREF="${bm.url || ''}" ADD_DATE="${Math.floor(Date.now() / 1000)}">${bm.name || 'Untitled'}</A>\n`;
+                     if (bm.description) {
+                         html += `        <DD>${bm.description}\n`;
+                     }
+                 });
+
+                 html += `</DL><p>\n`; // End of the main list
+                 return html;
+             }
+
+             function generateTxtExport(bookmarks) {
+                // Simple format: Name, URL, Category, Description per line, separated by tabs
+                return bookmarks.map(bm =>
+                    `${bm.name || ''}\t${bm.url || ''}\t${bm.category || ''}\t${(bm.description || '').replace(/\n/g, ' ')}` // Replace newlines in description
+                ).join('\n');
+             }
+
+
+            function triggerImport() {
+                 const input = document.createElement('input');
+                 input.type = 'file';
+                 input.accept = '.json,.txt,.html'; // Accept multiple types
+                 input.onchange = (e) => {
+                     const file = e.target.files[0];
+                     if (!file) return;
+
+                     const reader = new FileReader();
+                     reader.onload = (event) => {
+                         const content = event.target.result;
+                         const fileType = file.name.split('.').pop().toLowerCase();
+                         parseAndImportData(content, fileType);
+                     };
+                     reader.onerror = () => {
+                          console.error("Error reading file:", reader.error);
+                          alert("读取文件时发生错误。");
+                     };
+                     reader.readAsText(file); // Read content as text
+                 };
+                 input.click();
+             }
+
+            function parseAndImportData(content, type) {
+                 let importedBookmarks = [];
+                 let skippedCount = 0;
+                 const existingUrls = new Set(state.bookmarks.map(bm => bm.url));
+
+                 try {
+                     if (type === 'json') {
+                         const jsonData = JSON.parse(content);
+                         if (Array.isArray(jsonData)) {
+                             importedBookmarks = jsonData.map((item, index) => ({
+                                 id: Date.now() + index + Math.random(), // Generate new unique ID
+                                 name: item.name || '',
+                                 url: item.url || '',
+                                 description: item.description || '',
+                                 category: item.category || ''
+                             }));
+                         } else { throw new Error("JSON文件不是有效的书签数组。"); }
+                     } else if (type === 'html') {
+                         const parser = new DOMParser();
+                         const doc = parser.parseFromString(content, 'text/html');
+                         const links = doc.querySelectorAll('a');
+                         links.forEach((link, index) => {
+                             const url = link.getAttribute('href');
+                             if (url && !url.startsWith('data:') && !url.startsWith('javascript:')) {
+                                 const name = link.textContent.trim() || 'Untitled';
+                                 // Try to find description in the next <DD> tag if it exists
+                                 let description = '';
+                                 const dd = link.closest('DT')?.nextElementSibling;
+                                 if (dd && dd.tagName === 'DD') {
+                                     description = dd.textContent.trim();
+                                 }
+                                 importedBookmarks.push({ id: Date.now() + index + Math.random(), name, url, description, category: '' });
+                             }
+                         });
+                     } else if (type === 'txt') {
+                         const lines = content.split('\n');
+                         lines.forEach((line, index) => {
+                             const parts = line.split('\t'); // Assuming tab-separated: Name, URL, Category, Description
+                             if (parts.length >= 2 && parts[1].trim()) { // Need at least Name and URL
+                                 importedBookmarks.push({
+                                     id: Date.now() + index + Math.random(),
+                                     name: parts[0].trim() || 'Untitled',
+                                     url: parts[1].trim(),
+                                     category: (parts[2] || '').trim(),
+                                     description: (parts[3] || '').trim()
+                                 });
+                             }
+                         });
+                     } else {
+                         throw new Error("不支持的文件类型。请选择 JSON, HTML 或 TXT 文件。");
+                     }
+
+                     // Filter out duplicates and merge
+                     const uniqueNewBookmarks = [];
+                     importedBookmarks.forEach(bm => {
+                         if (bm.url && !existingUrls.has(bm.url)) {
+                             uniqueNewBookmarks.push(bm);
+                             existingUrls.add(bm.url); // Add to set to prevent duplicates within the import itself
+                         } else {
+                             skippedCount++;
+                         }
+                     });
+
+                     if (uniqueNewBookmarks.length > 0) {
+                         if (confirm(`即将导入 ${uniqueNewBookmarks.length} 个新书签。\n(${skippedCount} 个重复或无效的书签将被跳过)\n是否继续？`)) {
+                             state.bookmarks.push(...uniqueNewBookmarks);
+                             saveData();
+                             filterAndRenderBookmarks();
+                             alert(`成功导入 ${uniqueNewBookmarks.length} 个书签。`);
+                         }
+                     } else {
+                         alert(`没有新的书签可导入。 (${skippedCount} 个重复或无效的书签被跳过)`);
+                     }
+
+                 } catch (error) {
+                     console.error("Error parsing or importing data:", error);
+                     alert(`导入失败：无法处理文件。\n错误: ${error.message}`);
+                 }
+             }
+
+            // --- Drag and Drop Handlers ---
+            function handleDragStart(e) {
+                 if (state.isEditMode) { e.preventDefault(); return; }
+                 const targetCard = e.target.closest('.bookmark-card');
+                 if (!targetCard) return;
+                 dragSrcIndex = parseInt(targetCard.dataset.globalIndex, 10); // Use global index
+                 e.dataTransfer.effectAllowed = 'move';
+                 e.dataTransfer.setData('text/plain', targetCard.dataset.id); // Use ID for data transfer
+                 setTimeout(() => targetCard.classList.add('dragging'), 0);
+             }
+
+            function handleDragOver(e) {
+                 e.preventDefault();
+                 if (state.isEditMode || dragSrcIndex === null) return;
+                 const targetCard = e.target.closest('.bookmark-card');
+                 if (targetCard && targetCard !== dropTarget) {
+                     if (dropTarget) dropTarget.classList.remove('drop-target');
+                     const targetGlobalIndex = parseInt(targetCard.dataset.globalIndex, 10);
+                     if (targetGlobalIndex !== dragSrcIndex) {
+                         targetCard.classList.add('drop-target');
+                         dropTarget = targetCard;
+                     } else { dropTarget = null; }
+                 }
+                 e.dataTransfer.dropEffect = 'move';
+             }
+
+            function handleDragLeave(e) {
+                 const targetCard = e.target.closest('.bookmark-card');
+                 if (targetCard && targetCard === dropTarget && !targetCard.contains(e.relatedTarget)) {
+                     targetCard.classList.remove('drop-target');
+                     dropTarget = null;
+                 }
+            }
+
+            function handleDrop(e) {
+                 e.preventDefault();
+                 e.stopPropagation();
+                 if (state.isEditMode || dragSrcIndex === null || !dropTarget) {
+                    if(dropTarget) dropTarget.classList.remove('drop-target');
+                    dragSrcIndex = null; dropTarget = null;
+                    return;
+                 }
+
+                const dropTargetGlobalIndex = parseInt(dropTarget.dataset.globalIndex, 10);
+                dropTarget.classList.remove('drop-target');
+
+                 if (dragSrcIndex === dropTargetGlobalIndex) { // Dropped on self
+                    dragSrcIndex = null; dropTarget = null;
+                    return;
+                 }
+
+                 // Perform move using global indices
+                 const itemToMove = state.bookmarks[dragSrcIndex];
+                 state.bookmarks.splice(dragSrcIndex, 1);
+                 // Adjust target index if source was before target
+                 const actualTargetIndex = (dragSrcIndex < dropTargetGlobalIndex) ? dropTargetGlobalIndex -1 : dropTargetGlobalIndex;
+                 state.bookmarks.splice(actualTargetIndex, 0, itemToMove);
+
+
+                 saveData();
+                 filterAndRenderBookmarks(); // Re-render preserves filter, updates indices
+
+                 dragSrcIndex = null;
+                 dropTarget = null;
+             }
+
+            function handleDragEnd(e) {
+                 const draggingElement = document.querySelector('.bookmark-card.dragging');
+                 if (draggingElement) draggingElement.classList.remove('dragging');
+                 if (dropTarget) dropTarget.classList.remove('drop-target');
+                 dragSrcIndex = null; dropTarget = null;
+             }
+
+             // --- Modal Controls ---
+             function openBookmarkModal() { bookmarkModal.style.display = 'block'; setTimeout(() => bookmarkNameInput.focus(), 0); }
+             function closeBookmarkModal() { bookmarkModal.style.display = 'none'; bookmarkForm.reset(); bookmarkIdInput.value = ''; bookmarkModalTitle.textContent = '添加书签'; bookmarkModalSubmitBtn.textContent = '添加';}
+             function closeMessageModal() { messageModal.style.display = 'none'; }
+             function showWelcomeModalIfNeeded() { if (state.isFirstRun) welcomeModal.style.display = 'block'; }
+             function closeWelcomeModal() { welcomeModal.style.display = 'none'; localStorage.setItem(LOCAL_STORAGE_KEYS.firstRun, 'true'); state.isFirstRun = false; }
+
+            // --- Initialization ---
+            function initializeApp() {
+                // Setup Listeners
+                addBookmarkBtn.addEventListener('click', openBookmarkModal);
+                editModeBtn.addEventListener('click', toggleEditMode);
+                messageBoardBtn.addEventListener('click', showMessageBoard);
+                batchDeleteBtn.addEventListener('click', batchDeleteBookmarks);
+                undoBtn.addEventListener('click', undoDelete);
+                importBtn.addEventListener('click', triggerImport);
+                exportBtn.addEventListener('click', openExportModal); // Opens export format modal
+                exportButtonFinal.addEventListener('click', triggerExport); // Triggers actual export
+                viewSelect.addEventListener('change', (e) => switchView(e.target.value));
+
+                // Search Listener (Debounced)
+                searchInput.addEventListener('input', debouncedSearch);
+
+                 // Bookmark Modal Listeners
+                 closeBookmarkModalBtn.addEventListener('click', closeBookmarkModal);
+                 bookmarkForm.addEventListener('submit', (event) => {
+                     event.preventDefault();
+                     const formData = {
+                         id: bookmarkIdInput.value, // Will be empty string for adds
+                         name: bookmarkNameInput.value.trim(),
+                         url: bookmarkUrlInput.value.trim(),
+                         description: bookmarkDescriptionInput.value.trim(),
+                         category: bookmarkCategoryInput.value.trim()
+                     };
+                     if (formData.id) { // If ID exists, it's an update
+                         updateBookmark(formData);
+                     } else { // Otherwise, it's an add
+                         addBookmark(formData);
+                     }
+                 });
+
+                 // Message Modal Listeners
+                 closeMessageModalBtn.addEventListener('click', closeMessageModal);
+                 messageTextarea.addEventListener('dblclick', handleMessageEdit);
+                 saveMessageBtn.addEventListener('click', saveMessage);
+
+                 // Export Modal Listener
+                 closeExportModalBtn.addEventListener('click', closeExportModal);
+
+                 // Welcome Modal Listeners
+                 closeWelcomeBtn.addEventListener('click', closeWelcomeModal);
+                 closeWelcomeXBtn.addEventListener('click', closeWelcomeModal);
+
+                // Close modals on outside click
+                window.addEventListener('click', (event) => {
+                    if (event.target === bookmarkModal) closeBookmarkModal();
+                    if (event.target === messageModal) closeMessageModal();
+                    if (event.target === exportModal) closeExportModal();
+                    if (event.target === welcomeModal) closeWelcomeModal();
+                });
+
+                // Load data, apply settings, render initial view
+                loadData();
+
+                 // Show welcome modal OR prompt for import if needed
+                 showWelcomeModalIfNeeded();
+                 if (!state.isFirstRun && state.bookmarks.length === 0) {
+                     // Prompt only if not first run and list is empty
+                     // This was part of the original file's logic
+                     // autoPromptImport(); // Re-enable if desired, but often better to let user click import
+                     console.log("Bookmark list is empty after first run. User can import manually.");
+                 }
+            }
+
+            // Start the application
+            initializeApp();
+
+        })(); // IIFE ends here
+    </script>
+</body>
+</html>
