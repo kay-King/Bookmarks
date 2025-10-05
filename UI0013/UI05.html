@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>书签管理器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --background-color: #f4f6f8;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --border-radius: 10px;
+            --box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            --transition: all 0.3s ease;
+            --button-height: 30px;
+            --card-height: 150px;
+            --content-line-height: 20px;
+            --card-padding: 8px;
+            --content-margin: 4px;
+            --card-width: 220px;
+            --sidebar-width: 150px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.5;
+            letter-spacing: 0.5px;
+            box-sizing: border-box;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #toolbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            z-index: 1000;
+            box-sizing: border-box;
+            height: 60px;
+        }
+
+        #title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+            flex-shrink: 0;
+        }
+
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            flex-grow: 1;
+            justify-content: flex-end;
+        }
+
+        button {
+            padding: 5px 10px;
+            border: 1px solid var(--primary-color);
+            border-radius: var(--border-radius);
+            background: #fff;
+            color: var(--primary-color);
+            font-size: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            height: var(--button-height);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-sizing: border-box;
+        }
+
+        button:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #search {
+            width: 200px;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: var(--border-radius);
+            font-size: 12px;
+            transition: var(--transition);
+            box-sizing: border-box;
+        }
+
+        #search:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        #content-wrapper {
+            display: flex;
+            margin-top: 60px;
+            height: calc(100vh - 60px);
+        }
+
+        #sidebar {
+            width: var(--sidebar-width);
+            background: var(--card-background);
+            padding: 20px;
+            box-shadow: var(--box-shadow);
+            overflow-y: scroll;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        #sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #sidebar::-webkit-scrollbar-thumb {
+            background: #b0b0b0;
+            border-radius: 4px;
+            border: 2px solid var(--card-background);
+        }
+
+        #sidebar::-webkit-scrollbar-thumb:hover {
+            background: #909090;
+        }
+
+        #sidebar::-webkit-scrollbar-track {
+            background: #d3d3d3;
+        }
+
+        #sidebar h2 {
+            margin: 0 0 15px;
+            font-size: 16px;
+            color: var(--text-color);
+        }
+
+        .category-item {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: #ffffff;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .category-item:hover {
+            background: #d1d5db;
+        }
+
+        .category-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        #main-content {
+            flex-grow: 1;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            height: calc(100vh - 60px);
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        }
+
+        #main-content::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #main-content::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+
+        #main-content::-webkit-scrollbar-track {
+            background: var(--background-color);
+        }
+
+        #tips {
+            max-width: 1100px;
+            margin: 0 auto 20px;
+            padding: 15px 10px;
+            border-left: 4px solid #ffca28;
+            background: #fff8e1;
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            color: #856404;
+            line-height: 1.6;
+            display: block;
+        }
+
+        #container {
+            max-width: 1100px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        #stats {
+            max-width: 1100px;
+            margin: 20px auto;
+            padding: 15px;
+            background: #fff;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            font-size: 14px;
+            color: var(--text-color);
+            text-align: center;
+        }
+
+        /* 空状态样式 */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: var(--secondary-color);
+            padding: 20px;
+        }
+
+        .empty-state .doraemon {
+            width: 200px;
+            height: 200px;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .empty-state .doraemon::before {
+            content: '';
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            background: #00b7ee; /* 哆啦A梦蓝色 */
+            border-radius: 50%;
+            top: 20px;
+            left: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .empty-state .doraemon::after {
+            content: '';
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            background: #fff; /* 白色脸部 */
+            border-radius: 50%;
+            top: 40px;
+            left: 30px;
+            border: 4px solid #000;
+        }
+
+        .empty-state .doraemon .eyes {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 40px;
+        }
+
+        .empty-state .doraemon .eyes::before,
+        .empty-state .doraemon .eyes::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #fff;
+            border: 2px solid #000;
+            border-radius: 50%;
+        }
+
+        .empty-state .doraemon .eyes::before {
+            left: 0;
+        }
+
+        .empty-state .doraemon .eyes::after {
+            right: 0;
+        }
+
+        .empty-state .doraemon .pupils::before,
+        .empty-state .doraemon .pupils::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #000;
+            border-radius: 50%;
+            top: 70px;
+        }
+
+        .empty-state .doraemon .pupils::before {
+            left: 66px;
+        }
+
+        .empty-state .doraemon .pupils::after {
+            left: 106px;
+        }
+
+        .empty-state .doraemon .nose {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #ff4040; /* 红色鼻子 */
+            border-radius: 50%;
+            top: 100px;
+            left: 90px;
+            border: 2px solid #000;
+        }
+
+        .empty-state .doraemon .whiskers {
+            position: absolute;
+            top: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 20px;
+        }
+
+        .empty-state .doraemon .whiskers::before,
+        .empty-state .doraemon .whiskers::after,
+        .empty-state .doraemon .whiskers span::before,
+        .empty-state .doraemon .whiskers span::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 2px;
+            background: #000;
+        }
+
+        .empty-state .doraemon .whiskers::before {
+            top: -10px;
+            left: 10px;
+            transform: rotate(-15deg);
+        }
+
+        .empty-state .doraemon .whiskers::after {
+            top: -10px;
+            right: 10px;
+            transform: rotate(15deg);
+        }
+
+        .empty-state .doraemon .whiskers span::before {
+            top: 10px;
+            left: 10px;
+            transform: rotate(15deg);
+        }
+
+        .empty-state .doraemon .whiskers span::after {
+            top: 10px;
+            right: 10px;
+            transform: rotate(-15deg);
+        }
+
+        .empty-state h2 {
+            font-size: 24px;
+            margin: 0 0 10px;
+            color: var(--text-color);
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            margin: 0 0 20px;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+
+        .empty-state .button-group {
+            display: flex;
+            gap: 15px; /* 按钮间距 */
+        }
+
+        .empty-state .action-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: var(--border-radius);
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .empty-state .action-btn:hover {
+            background: #0056b3;
+            transform: scale(1.05);
+        }
+
+        .empty-state .secondary-btn {
+            background: #fff;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+
+        .empty-state .secondary-btn:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .bookmark-grid {
+            display: grid;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            box-sizing: border-box;
+            grid-template-columns: repeat(auto-fill, minmax(var(--card-width), 1fr));
+        }
+
+        .bookmark-card {
+            background: var(--card-background);
+            border: 1px solid #e5e7eb;
+            padding: var(--card-padding);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            transition: transform 0.3s ease, opacity 0.3s ease, border 0.3s ease;
+            cursor: move;
+            height: var(--card-height);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bookmark-card h3 {
+            margin: 0;
+            margin-bottom: var(--content-margin);
+            font-size: 15px;
+            color: #000;
+            height: var(--content-line-height);
+            line-height: var(--content-line-height);
+            position: relative;
+            padding-right: 24px;
+            display: flex;
+            align-items: center;
+        }
+
+        .bookmark-card p.url {
+            margin: 0;
+            margin-bottom: var(--content-margin);
+            font-size: 14px;
+            color: #000;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            height: var(--content-line-height);
+            line-height: var(--content-line-height);
+        }
+
+        .bookmark-card .desc {
+            margin: 0;
+            font-size: 13px;
+            color: #888;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            height: calc(var(--content-line-height) * 2);
+            line-height: var(--content-line-height);
+        }
+
+        #add-form {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--card-background);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            width: 400px;
+            box-sizing: border-box;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-weight: 500;
+            color: var(--text-color);
+            margin-right: 5px;
+            min-width: 50px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: var(--transition);
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        #pagination {
+            max-width: 1100px;
+            margin: 20px auto 0;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <div id="title">书签管理器</div>
+        <div id="controls">
+            <button onclick="toggleAddForm(true)">➕ 添加书签</button>
+            <button id="edit-mode-btn" onclick="toggleEditMode()">✏️ 编辑书签</button>
+            <button id="done-btn" onclick="toggleEditMode()" style="display: none;">✅ 完成</button>
+            <button onclick="showExportModal()">📤 导出书签</button>
+            <button onclick="document.getElementById('import-file').click()">📥 导入书签</button>
+            <input type="file" id="import-file" style="display: none;" accept=".json,.txt,.html" onchange="importBookmarks(event)">
+            <button onclick="showHelpModal()">❓ 使用帮助</button>
+            <button onclick="toggleMessageForm()">📝 留言板</button>
+            <button id="delete-page-btn" class="delete-btn" onclick="deletePageBookmarks()">🗑️ 删除本页书签</button>
+            <button id="batch-delete-btn" class="batch-delete-btn" onclick="batchDeleteBookmarks()" style="display: none;">🗑️ 批量删除</button>
+            <button id="undo-btn" onclick="undoDelete()" style="display: none;">↩️ 撤销</button>
+            <input type="text" id="search" placeholder="搜索书签（名称）" oninput="debounce(searchBookmarks, 300)()">
+        </div>
+    </div>
+    <div id="content-wrapper">
+        <div id="sidebar">
+            <h2>分类</h2>
+            <div id="categories"></div>
+        </div>
+        <div id="main-content">
+            <div id="tips">您可以添加、编辑、删除和拖动排序书签。使用“导出书签”保存数据到 bookmarks.json、txt 或 html 文件，html 文件可直接导入浏览器。文件将保存到您的下载目录，请手动移动到程序所在文件夹与他人分享。导入时将文件放入同一目录并点击“导入书签”加载。</div>
+            <div id="container">
+                <div id="bookmarks" class="bookmark-grid"></div>
+            </div>
+            <div id="stats"></div>
+            <div id="pagination"></div>
+        </div>
+    </div>
+
+    <div id="overlay" onclick="hideAllModals()"></div>
+    <div id="add-form">
+        <h3>添加/编辑书签</h3>
+        <div class="form-group">
+            <label>名称:</label>
+            <input type="text" id="name" placeholder="请输入书签名称">
+        </div>
+        <div class="form-group">
+            <label>链接:</label>
+            <input type="text" id="url" placeholder="请输入链接 (如 https://example.com)">
+        </div>
+        <div class="form-group">
+            <label>简介:</label>
+            <textarea id="desc" placeholder="请输入简介（可选）"></textarea>
+        </div>
+        <div class="form-group">
+            <label>分类:</label>
+            <input type="text" id="category" list="category-list" placeholder="输入或选择分类">
+            <datalist id="category-list"></datalist>
+        </div>
+        <div class="form-buttons">
+            <button onclick="saveBookmark()">💾 保存</button>
+            <button onclick="toggleAddForm(false)">❌ 取消</button>
+        </div>
+    </div>
+
+    <script>
+        // 状态管理
+        const state = {
+            bookmarks: [],
+            message: '',
+            lastDeletedBookmark: null,
+            lastDeletedIndex: null,
+            filteredBookmarks: [],
+            selectedCategory: '全部',
+            editingIndex: null,
+            isEditMode: false,
+            selectedBookmarks: [],
+            currentPage: 1,
+            isFirstRun: !localStorage.getItem('hasRunBefore')
+        };
+
+        const MAX_BOOKMARKS = 1000;
+
+        // 工具函数
+        function debounce(func, wait) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        function getRandomLightColor() {
+            const r = Math.floor(Math.random() * 56) + 200;
+            const g = Math.floor(Math.random() * 56) + 200;
+            const b = Math.floor(Math.random() * 56) + 200;
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function isValidUrl(string) {
+            try {
+                const url = new URL(string);
+                return /^(http|https):/.test(url.protocol) && !!url.hostname;
+            } catch {
+                return false;
+            }
+        }
+
+        // 模态框管理
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            }
+        }
+
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+                document.getElementById('overlay').style.display = 'none';
+            }
+        }
+
+        function hideAllModals() {
+            ['add-form'].forEach(id => hideModal(id));
+            state.editingIndex = null;
+        }
+
+        // 数据管理
+        function saveBookmarks() {
+            try {
+                if (state.bookmarks.length > MAX_BOOKMARKS) {
+                    alert(`书签数量已超过最大限制 (${MAX_BOOKMARKS} 个)，请删除一些书签！`);
+                    return false;
+                }
+                const data = { bookmarks: state.bookmarks, message: state.message };
+                localStorage.setItem('bookmarkData', JSON.stringify(data));
+                renderCategories();
+                filterBookmarks();
+                renderBookmarks();
+                updateStats();
+                return true;
+            } catch (e) {
+                console.error('保存数据失败：', e);
+                alert(`保存数据失败：${e.message}`);
+                return false;
+            }
+        }
+
+        function loadBookmarks() {
+            try {
+                const storedData = localStorage.getItem('bookmarkData');
+                if (!storedData) {
+                    state.bookmarks = [];
+                    state.message = '';
+                } else {
+                    const data = JSON.parse(storedData);
+                    state.bookmarks = Array.isArray(data.bookmarks) ? data.bookmarks.map(b => ({
+                        name: b.name || '未命名',
+                        url: b.url || '',
+                        desc: b.desc || '',
+                        category: b.category || '默认分组',
+                        color: b.color || getRandomLightColor()
+                    })) : [];
+                    state.message = typeof data.message === 'string' ? data.message : '';
+                }
+            } catch (e) {
+                console.error('加载数据失败：', e);
+                state.bookmarks = [];
+                state.message = '';
+            }
+            filterBookmarks();
+            renderCategories();
+            renderBookmarks();
+            updateStats();
+        }
+
+        // 渲染与过滤
+        function filterBookmarks() {
+            const query = document.getElementById('search')?.value.toLowerCase() || '';
+            state.filteredBookmarks = state.selectedCategory === '全部'
+                ? state.bookmarks.filter(b => b.name.toLowerCase().includes(query))
+                : state.bookmarks.filter(b => (b.category || '默认分组') === state.selectedCategory && b.name.toLowerCase().includes(query));
+            state.currentPage = 1;
+        }
+
+        function renderCategories() {
+            const container = document.getElementById('categories');
+            if (!container) return;
+            const categories = ['全部', '默认分组', ...new Set(state.bookmarks.map(b => b.category).filter(cat => cat && cat !== '默认分组'))];
+            container.innerHTML = '';
+            categories.forEach(cat => {
+                const div = document.createElement('div');
+                div.className = `category-item${cat === state.selectedCategory ? ' active' : ''}`;
+                div.textContent = cat;
+                div.title = cat;
+                div.onclick = () => selectCategory(cat);
+                container.appendChild(div);
+            });
+        }
+
+        function getItemsPerPage() {
+            return 24;
+        }
+
+        function renderBookmarks() {
+            const container = document.getElementById('bookmarks');
+            if (!container) return;
+            container.innerHTML = '';
+            container.className = 'bookmark-grid';
+
+            const itemsPerPage = getItemsPerPage();
+            const startIndex = (state.currentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, state.filteredBookmarks.length);
+            const paginatedBookmarks = state.filteredBookmarks.slice(startIndex, endIndex);
+
+            if (state.filteredBookmarks.length === 0) {
+                container.className = 'empty-state';
+                container.innerHTML = `
+                    <div class="doraemon">
+                        <div class="eyes"></div>
+                        <div class="pupils"></div>
+                        <div class="nose"></div>
+                        <div class="whiskers"><span></span></div>
+                    </div>
+                    <h2>欢迎使用书签管理器</h2>
+                    <p>目前还没有书签，快来添加你的第一个书签吧！或者导入已有书签，快速开始管理。</p>
+                    <div class="button-group">
+                        <button class="action-btn" onclick="toggleAddForm(true)">➕ 添加书签</button>
+                        <button class="action-btn secondary-btn" onclick="document.getElementById('import-file').click()">📥 导入书签</button>
+                    </div>
+                `;
+                document.getElementById('pagination').style.display = 'none';
+                document.getElementById('stats').style.display = 'none';
+                return;
+            }
+
+            paginatedBookmarks.forEach((bookmark, index) => {
+                const div = document.createElement('div');
+                div.className = `bookmark-card${state.isEditMode ? ' edit-mode' : ''}`;
+                div.draggable = !state.isEditMode;
+                div.dataset.index = startIndex + index;
+                div.style.backgroundColor = bookmark.color;
+
+                const displayName = bookmark.name.length > 10 ? bookmark.name.substring(0, 10) + '...' : bookmark.name;
+                const displayCategory = bookmark.category.length > 5 ? bookmark.category.substring(0, 5) + '...' : bookmark.category;
+
+                div.innerHTML = `
+                    <h3>${escapeHtml(displayName)}</h3>
+                    <p class="url"><a href="${escapeHtml(bookmark.url)}" target="_blank">${escapeHtml(bookmark.url)}</a></p>
+                    <div class="desc">${escapeHtml(bookmark.desc)}</div>
+                    <div class="category-container"><span class="category-tag">${escapeHtml(displayCategory)}</span></div>
+                `;
+
+                container.appendChild(div);
+            });
+
+            renderPagination();
+            updateStats();
+        }
+
+        function renderPagination() {
+            const container = document.getElementById('pagination');
+            if (!container) return;
+            container.innerHTML = '';
+            const itemsPerPage = getItemsPerPage();
+            const totalPages = Math.max(1, Math.ceil(state.filteredBookmarks.length / itemsPerPage));
+
+            if (state.filteredBookmarks.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'flex';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = '«';
+            prevBtn.disabled = state.currentPage === 1;
+            prevBtn.onclick = () => {
+                if (state.currentPage > 1) {
+                    state.currentPage--;
+                    renderBookmarks();
+                }
+            };
+            container.appendChild(prevBtn);
+
+            for (let i = 1; i <= totalPages; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i;
+                pageBtn.classList.toggle('active', i === state.currentPage);
+                pageBtn.onclick = () => {
+                    state.currentPage = i;
+                    renderBookmarks();
+                };
+                container.appendChild(pageBtn);
+            }
+
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = '»';
+            nextBtn.disabled = state.currentPage === totalPages;
+            nextBtn.onclick = () => {
+                if (state.currentPage < totalPages) {
+                    state.currentPage++;
+                    renderBookmarks();
+                }
+            };
+            container.appendChild(nextBtn);
+        }
+
+        function updateStats() {
+            const statsDiv = document.getElementById('stats');
+            if (!statsDiv) return;
+            const totalBookmarks = state.bookmarks.length;
+            statsDiv.textContent = `总书签数：${totalBookmarks}`;
+            statsDiv.style.display = state.filteredBookmarks.length > 0 ? 'block' : 'none';
+        }
+
+        function selectCategory(category) {
+            state.selectedCategory = category;
+            filterBookmarks();
+            renderBookmarks();
+            updateStats();
+            renderCategories();
+        }
+
+        function toggleAddForm(show) {
+            const form = document.getElementById('add-form');
+            if (!form) return;
+            if (show) {
+                showModal('add-form');
+            } else {
+                hideModal('add-form');
+                state.editingIndex = null;
+                document.getElementById('name').value = '';
+                document.getElementById('url').value = '';
+                document.getElementById('desc').value = '';
+                document.getElementById('category').value = '';
+            }
+        }
+
+        function saveBookmark() {
+            const nameInput = document.getElementById('name');
+            const urlInput = document.getElementById('url');
+            const descInput = document.getElementById('desc');
+            const categoryInput = document.getElementById('category');
+            if (!nameInput || !urlInput) return;
+
+            const name = nameInput.value.trim();
+            let url = urlInput.value.trim();
+            const desc = descInput.value.trim();
+            const category = categoryInput.value.trim();
+
+            if (!name || !url) {
+                alert('请填写名称和链接');
+                return;
+            }
+            if (!url.match(/^https?:\/\//)) url = 'https://' + url;
+            if (!isValidUrl(url)) {
+                alert('请输入有效的URL');
+                return;
+            }
+
+            const bookmark = {
+                name,
+                url,
+                desc,
+                category: category || '默认分组',
+                color: getRandomLightColor()
+            };
+
+            if (state.editingIndex !== null && state.editingIndex < state.filteredBookmarks.length) {
+                const globalIndex = state.bookmarks.indexOf(state.filteredBookmarks[state.editingIndex]);
+                if (globalIndex !== -1) state.bookmarks[globalIndex] = bookmark;
+            } else {
+                state.bookmarks.push(bookmark);
+            }
+            if (saveBookmarks()) toggleAddForm(false);
+        }
+
+        function importBookmarks(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (Array.isArray(data.bookmarks)) {
+                        data.bookmarks.forEach(b => {
+                            if (b.name && b.url) {
+                                state.bookmarks.push({
+                                    name: b.name,
+                                    url: b.url,
+                                    desc: b.desc || '',
+                                    category: b.category || '默认分组',
+                                    color: b.color || getRandomLightColor()
+                                });
+                            }
+                        });
+                        saveBookmarks();
+                        alert('导入成功！');
+                    } else {
+                        alert('无效的书签文件');
+                    }
+                } catch (e) {
+                    alert('导入失败：' + e.message);
+                }
+                document.getElementById('import-file').value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function toggleEditMode() {
+            state.isEditMode = !state.isEditMode;
+            renderBookmarks();
+        }
+
+        function deletePageBookmarks() {
+            // 占位，后续实现
+        }
+
+        function batchDeleteBookmarks() {
+            // 占位，后续实现
+        }
+
+        function undoDelete() {
+            // 占位，后续实现
+        }
+
+        function showExportModal() {
+            // 占位，后续实现
+        }
+
+        function showHelpModal() {
+            // 占位，后续实现
+        }
+
+        function toggleMessageForm() {
+            // 占位，后续实现
+        }
+
+        function searchBookmarks() {
+            filterBookmarks();
+            renderBookmarks();
+            updateStats();
+        }
+
+        // 初始化
+        window.onload = () => {
+            loadBookmarks();
+        };
+    </script>
+</body>
+</html>
